@@ -2,6 +2,7 @@ from nltk.tokenize import RegexpTokenizer
 from sklearn.model_selection import train_test_split
 from collections import Counter
 from nltk.stem import PorterStemmer, WordNetLemmatizer
+from sklearn.preprocessing import LabelEncoder
 
 
 def calculate_label(a1, a2, a3):
@@ -26,9 +27,23 @@ def set_final_label(df):
     return df
 
 
-def split_data(df):
+def split_sentence_data(df):
+
+    # print df
 
     X = df.iloc[:, 4].values
+    y = df.iloc[:, 5].values
+
+    return train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+def split_data(df):
+
+    lb_make = LabelEncoder()
+    df["domain"] = lb_make.fit_transform(df["domain"])
+    df["section"] = lb_make.fit_transform(df["section"])
+
+    X = df[['domain', 'section', 'line', 'sentence']].values
     y = df.iloc[:, 5].values
 
     return train_test_split(X, y, test_size=0.2, random_state=42)
@@ -79,3 +94,6 @@ def process_text(text, stopwords_file=None, stemming=False, lemmetization=False)
 
 
     return " ".join(filtered_words)
+
+
+
