@@ -26,11 +26,11 @@ def main():
     # Train classifiers
     #train_model.naive_bayes_unigram(X_train, y_train, X_test, y_test)
     #train_model.svm_unigram(X_train[:, 3], y_train, X_test[:, 3], y_test)
-    #train_model.svm_bigram(X_train[:, 3], y_train, X_test[:, 3], y_test)
+    train_model.svm_bigram(X_train[:, 3], y_train, X_test[:, 3], y_test)
     #train_model.svm_gridsearch(X_train[:, 3], y_train, X_test[:, 3], y_test)
 
-    train_model.svm_extra_features(X_train, X_test, X_test, y_test)
-    #train_model.word2vec(X_train[:, 3], y_train, X_test[:, 3], y_test)
+    #train_model.svm_extra_features(X_train, X_test, X_test, y_test)
+    train_model.word2vec(X_train[:, 3], y_train, X_test[:, 3], y_test)
 
 
 if __name__ == '__main__':
