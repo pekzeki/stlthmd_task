@@ -29,12 +29,10 @@ def set_final_label(df):
 
 def split_sentence_data(df):
 
-    # print df
-
     X = df.iloc[:, 4].values
     y = df.iloc[:, 5].values
 
-    return train_test_split(X, y, test_size=0.2, random_state=42)
+    return train_test_split(X, y, test_size=0.25, random_state=42)
 
 
 def split_data(df):
@@ -46,7 +44,7 @@ def split_data(df):
     X = df[['domain', 'section', 'line', 'sentence']].values
     y = df.iloc[:, 5].values
 
-    return train_test_split(X, y, test_size=0.2, random_state=42)
+    return train_test_split(X, y, test_size=0.25, random_state=42)
 
 
 def get_stop_words(stopwords_file):
