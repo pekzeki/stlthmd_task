@@ -39,10 +39,10 @@ def process_documents(directory, base_info, file_list):
     doc_id = base_infos[1] + '_' + base_infos[2]
 
     for file in sorted(file_list):
+        count = 1
         with open(directory + '/' + file, 'r') as f:
-            for i, line in enumerate(f):
-
-                key = str([domain, doc_id, i])
+            for line in f:
+                key = str([domain, doc_id, count])
                 value = []
 
                 if "### abstract ###" in line:
@@ -58,12 +58,14 @@ def process_documents(directory, base_info, file_list):
                     the_value.append(label)
                     if len(the_value[1]) < len(sentence):
                         the_value[1] = sentence
+                    count = count + 1
                 else:
                     label, sentence = split_line(line)
                     value.append(section)
                     value.append(sentence)
                     value.append(label)
                     mydict[key] = value
+                    count = count + 1
 
     return mydict
 

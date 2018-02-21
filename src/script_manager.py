@@ -15,22 +15,27 @@ def main():
 
     # Extract a single label from inter-annotation information
     df = build_features.set_final_label(df)
-    # print df["final_label"].value_counts()
+    df = build_features.extra_features(df)
+    #print df.corr(method='pearson')
 
     # Process sentences
     df['sentence'] = df['sentence'].apply(
-        lambda x: build_features.process_text(x, os.environ.get('STOP_WORDS_PATH'), stemming=False, lemmetization=False))
+        lambda x: build_features.process_text(x, stopwords_file=os.environ.get('STOP_WORDS_PATH'), stemming=False, lemmetization=False))
+        #lambda x: build_features.process_text(x, stopwords_file=os.environ.get('STOP_WORDS_PATH'), stemming=True, lemmetization=False))
     X_train, X_test, y_train, y_test = build_features.split_data(df)
 
 
     # Train classifiers
-    #train_model.naive_bayes_unigram(X_train, y_train, X_test, y_test)
-    #train_model.svm_unigram(X_train[:, 3], y_train, X_test[:, 3], y_test)
-    train_model.svm_bigram(X_train[:, 3], y_train, X_test[:, 3], y_test)
-    #train_model.svm_gridsearch(X_train[:, 3], y_train, X_test[:, 3], y_test)
+    #train_model.svm_unigram(X_train[:, 0], y_train, X_test[:, 3], y_test)
+    #train_model.svm_bigram(X_train[:, 0], y_train, X_test[:, 3], y_test)
+    #train_model.top_tfidf(X_train[:, 0])
 
-    #train_model.svm_extra_features(X_train, X_test, X_test, y_test)
-    train_model.word2vec(X_train[:, 3], y_train, X_test[:, 3], y_test)
+    #train_model.naive_bayes_unigram(X_train[:, 0], y_train, X_test[:, 3], y_test)
+    #train_model.svm_gridsearch(X_train[:, 0], y_train, X_test[:, 3], y_test)
+    #train_model.sgd_gridsearch(X_train[:, 0], y_train, X_test[:, 3], y_test)
+
+    #train_model.sgd_extra_features(X_train, y_train, X_test, y_test)
+    train_model.word2vec(X_train[:, 0], y_train, X_test[:, 0], y_test)
 
 
 if __name__ == '__main__':

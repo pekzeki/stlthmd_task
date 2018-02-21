@@ -1,54 +1,41 @@
+import string
 from collections import defaultdict
 
+import gensim
+import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.decomposition import PCA
+from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.decomposition import PCA
-from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import classification_report
-from sklearn.svm import SVC
-from sklearn.preprocessing import FunctionTransformer
 from sklearn.model_selection import GridSearchCV
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.preprocessing import FunctionTransformer
+from sklearn.svm import LinearSVC
 from sklearn.ensemble import ExtraTreesClassifier
-import numpy as np
-import gensim
+
+
+def top_tfidf(X_train):
+
+    tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3))
+    tfidf_matrix = tf.fit_transform(X_train)
+    feature_names = tf.get_feature_names()
+    doc = 0
+    feature_index = tfidf_matrix[doc, :].nonzero()[1]
+    tfidf_scores = zip(feature_index, [tfidf_matrix[doc, x] for x in feature_index])
+    for w, s in [(feature_names[i], s) for (i, s) in tfidf_scores]:
+        print w, '         ', s
 
 
 def naive_bayes_unigram(X_train, y_train, X_test, y_test):
     print "--------------------------"
-    print "Naive Bayes (Unigram + TFIDF)"
+    print "Naive Bayes (BernoulliNB + Unigram + TFIDF)"
     text_clf = Pipeline([('vect', CountVectorizer()),
                          ('tfidf', TfidfTransformer()),
-                         ('clf', MultinomialNB()),
-                         ])
-    text_clf = text_clf.fit(X_train, y_train)
-    test_results(text_clf, X_test, y_test)
-
-
-def svm_unigram(X_train, y_train, X_test, y_test):
-    print "--------------------------"
-    print "SVM (Unigram + TFIDF)"
-    text_clf = Pipeline([('vect', CountVectorizer()),
-                         ('tfidf', TfidfTransformer()),
-                         ('clf', SGDClassifier(loss='hinge', penalty='l2',
-                                               alpha=1e-3, random_state=42,
-                                               max_iter=5, tol=None)),
-                         ])
-
-    text_clf = text_clf.fit(X_train, y_train)
-    test_results(text_clf, X_test, y_test)
-
-
-def svm_bigram(X_train, y_train, X_test, y_test):
-    print "--------------------------"
-    print "SVM (Bigram + TFIDF)"
-    text_clf = Pipeline([('vect', CountVectorizer(ngram_range=(1, 3), token_pattern=r'\b\w+\b', min_df=1)),
-                         ('tfidf', TfidfTransformer()),
-                         ('clf', SGDClassifier(loss='hinge', penalty='l2',
-                                               alpha=1e-3, random_state=42,
-                                               max_iter=5, tol=None))
+                         ('clf', BernoulliNB()),
                          ])
 
     text_clf = text_clf.fit(X_train, y_train)
@@ -57,16 +44,37 @@ def svm_bigram(X_train, y_train, X_test, y_test):
 
 def svm_gridsearch(X_train, y_train, X_test, y_test):
     print "--------------------------"
-    print "SVM (GridSearchCV)"
+    print "LinearSVC (GridSearchCV + Balanced)"
+    text_clf = Pipeline([('vect', CountVectorizer()),
+                         ('tfidf', TfidfTransformer()),
+                         ('clf', LinearSVC(class_weight='balanced')),
+                         ])
+
+    params = dict(vect__ngram_range=[(1, 1), (1, 2), (1, 3)],
+                  tfidf__use_idf=(True, False),
+                  clf__C=(0.01, 0.1, 1, 10))
+
+    grid_search = GridSearchCV(text_clf, param_grid=params)
+    grid_search.fit(X_train, y_train)
+
+    print 'Best score: ', grid_search.best_score_
+    print 'Best params: ', grid_search.best_params_
+
+    test_results(grid_search, X_test, y_test)
+
+
+def sgd_gridsearch(X_train, y_train, X_test, y_test):
+    print "--------------------------"
+    print "SGD (GridSearchCV + Balanced)"
 
     text_clf = Pipeline([('vect', CountVectorizer(token_pattern=r'\b\w+\b', min_df=1)),
                          ('tfidf', TfidfTransformer()),
                          ('clf', SGDClassifier(loss='hinge', penalty='l2',
                                                random_state=42,
-                                               max_iter=5, tol=None))
+                                               max_iter=5, tol=None, class_weight='balanced'))
                          ])
 
-    params = dict(vect__ngram_range=[(1, 1), (1, 2)],
+    params = dict(vect__ngram_range=[(1, 1), (1, 2), (1, 3)],
                   tfidf__use_idf=(True, False),
                   clf__alpha=(1e-2, 1e-3))
 
@@ -75,10 +83,11 @@ def svm_gridsearch(X_train, y_train, X_test, y_test):
 
     print 'Best score: ', grid_search.best_score_
     print 'Best params: ', grid_search.best_params_
+
     test_results(grid_search, X_test, y_test)
 
 
-def svm_word2vec(X_train, y_train, X_test, y_test):
+def sgd_word2vec(X_train, y_train, X_test, y_test):
     print "--------------------------"
     print "SVM (Handcrafted Features)"
     estimators = [('reduce_dim', PCA()), ('clf', SVC())]
@@ -95,39 +104,53 @@ def svm_word2vec(X_train, y_train, X_test, y_test):
 
 # get_text_data = FunctionTransformer(lambda x: x['sentence'].values, validate=False)
 # get_numeric_data = FunctionTransformer(lambda x: x[['domain', 'section', 'line']].values, validate=False)
-get_text_data = FunctionTransformer(lambda x: x[:, 3], validate=False)
-get_numeric_data = FunctionTransformer(lambda x: x[:, :3].astype('float'), validate=False)
+get_text_data = FunctionTransformer(lambda x: x[:, 0], validate=False)
+domain = FunctionTransformer(lambda x: x[:, 1:2].astype('float64'), validate=False)
+section = FunctionTransformer(lambda x: x[:, 2:3].astype('float64'), validate=False)
+line = FunctionTransformer(lambda x: x[:, 3:4].astype('float64'), validate=False)
+word_length = FunctionTransformer(lambda x: x[:, 4:5].astype('float64'), validate=False)
+has_citation = FunctionTransformer(lambda x: x[:, 5:6].astype('float64'), validate=False)
+has_symbol = FunctionTransformer(lambda x: x[:, 6:7].astype('float64'), validate=False)
+has_number = FunctionTransformer(lambda x: x[:, 7:8].astype('float64'), validate=False)
 
 
-def svm_extra_features(X_train, y_train, X_test, y_test):
+def sgd_extra_features(X_train, y_train, X_test, y_test):
     print "--------------------------"
-    print "SVM (Handcrafted Features)"
+    print "SGD (Handcrafted Features)"
 
-    process_and_join_features = Pipeline([
+    estimators = [('reduce_dim', TruncatedSVD()), ('clf', LinearSVC(class_weight='balanced'))]
+    estimators_pipe = Pipeline(estimators)
+
+    pipeline = Pipeline([
         ('features', FeatureUnion([
-            ('text_features', Pipeline([
+            ('ngram_tf_idf', Pipeline([
                 ('selector', get_text_data),
-                ('vect', CountVectorizer(ngram_range=(1, 2), token_pattern=r'\b\w+\b', min_df=1)),
-                ('tfidf', TfidfTransformer())
+                ('vect', CountVectorizer()),
+                ('transformer', TfidfTransformer())
             ])),
-            ('numeric_features', Pipeline([
-                ('selector', get_numeric_data),
-                #('ave', AverageWordLengthExtractor()),
-                #('caster', ArrayCaster())
-            ])),
-            ('extra_features', Pipeline([
-                ('selector', get_text_data),
-                ('ave', AverageWordLengthExtractor()),
-                ('caster', ArrayCaster())
-            ]))
+            ('domain', domain),
+            ('section', section),
+            ('line', line),
+            ('word_length', word_length),
+            ('has_citation', has_citation),
+            ('has_symbol', has_symbol),
+            ('has_number', has_number)
         ])),
-        ('clf', SGDClassifier(loss='hinge', penalty='l2',
-                              alpha=1e-3, random_state=42,
-                              max_iter=5, tol=None)) # classifier)
+        ('estimators', estimators_pipe)
     ])
 
-    process_and_join_features = process_and_join_features.fit(X_train, y_train)
-    test_results(process_and_join_features, X_test, y_test)
+    params = dict(features__ngram_tf_idf__vect__ngram_range=[(1, 1), (1, 2), (1, 3)],
+                  features__ngram_tf_idf__transformer__use_idf=(True, False),
+                  estimators__clf__C=(0.1, 1, 10, 100),
+                  estimators__reduce_dim__n_components=[100, 110])
+
+    grid_search = GridSearchCV(pipeline, param_grid=params)
+    grid_search.fit(X_train, y_train)
+
+    print 'Best score: ', grid_search.best_score_
+    print 'Best params: ', grid_search.best_params_
+
+    test_results(grid_search, X_test, y_test)
 
 
 def word2vec(X_train, y_train, X_test, y_test):
@@ -135,13 +158,13 @@ def word2vec(X_train, y_train, X_test, y_test):
     model = gensim.models.KeyedVectors.load_word2vec_format(
         '/Users/arge/Downloads/stlthmd_task/data/raw/GoogleNews-vectors-negative300.bin', binary=True)
     w2v = dict(zip(model.wv.index2word, model.wv.syn0))
-    etree_w2v = Pipeline([
-        ("word2vec vectorizer", MeanEmbeddingVectorizer(w2v)),
-        ("extra trees", ExtraTreesClassifier(n_estimators=200))])
+    #etree_w2v = Pipeline([
+    #    ("word2vec vectorizer", MeanEmbeddingVectorizer(w2v)),
+    #    ("extra trees", ExtraTreesClassifier(class_weight='balanced', n_estimators=200))])
 
     etree_w2v = Pipeline([
         ("word2vec vectorizer", TfidfEmbeddingVectorizer(w2v)),
-        ("extra trees", ExtraTreesClassifier(n_estimators=200))])
+        ("extra trees", ExtraTreesClassifier(class_weight='balanced', n_estimators=200))])
 
     text_clf = etree_w2v.fit(X_train, y_train)
     test_results(text_clf, X_test, y_test)
@@ -155,33 +178,6 @@ def test_results(clf, X_test, y_test):
     print "--------------------------"
 
 
-class ArrayCaster(BaseEstimator, TransformerMixin):
-    def fit(self, x, y=None):
-        return self
-
-    def transform(self, data):
-        return np.transpose(np.matrix(data))
-
-
-class AverageWordLengthExtractor(BaseEstimator, TransformerMixin):
-    """Takes in dataframe, extracts road name column, outputs average word length"""
-
-    def __init__(self):
-        pass
-
-    def average_word_length(self, sentence):
-        """Helper code to compute average word length of a name"""
-        return np.mean([len(word) for word in sentence.split()])
-
-    def transform(self, X, y=None):
-        """The workhorse of this feature extractor"""
-        func = np.vectorize(self.average_word_length)
-        return func(X)
-
-    def fit(self, df, y=None):
-        """Returns `self` unless something different happens in train and test"""
-        return self
-
 
 class SentenceLengthExtractor(BaseEstimator, TransformerMixin):
     """Takes in dataframe, extracts road name column, outputs average word length"""
@@ -191,11 +187,35 @@ class SentenceLengthExtractor(BaseEstimator, TransformerMixin):
 
     def average_word_length(self, sentence):
         """Helper code to compute average word length of a name"""
-        return len(sentence.split())
+        sentence.translate(None, string.punctuation)
+        words = sentence.split()
+        return len(words)
 
     def transform(self, df, y=None):
         """The workhorse of this feature extractor"""
+        df['len'] = df['sentence'].apply(self.average_word_length)
         return df['sentence'].apply(self.average_word_length)
+
+    def fit(self, df, y=None):
+        """Returns `self` unless something different happens in train and test"""
+        return self
+
+
+class HasEntity(BaseEstimator, TransformerMixin):
+    """Takes in dataframe, extracts road name column, outputs average word length"""
+
+    def __init__(self, entity):
+        pass
+
+    def has_entity(self, line, entity):
+        if entity in line:
+            return 1
+        else:
+            return 0
+
+    def transform(self, df, y=None):
+        """The workhorse of this feature extractor"""
+        return df['sentence'].apply(self.has_entity)
 
     def fit(self, df, y=None):
         """Returns `self` unless something different happens in train and test"""
@@ -264,3 +284,30 @@ class TfidfEmbeddingVectorizer(object):
                               max_iter=5, tol=None))  # classifier
     ])
 '''
+
+
+def sgd_unigram(X_train, y_train, X_test, y_test):
+    print "--------------------------"
+    print "SVM (Unigram + TFIDF)"
+    text_clf = Pipeline([('vect', CountVectorizer()),
+                         ('tfidf', TfidfTransformer()),
+                         ('clf', SGDClassifier(loss='hinge', penalty='l2',
+                                               alpha=1e-3, random_state=42,
+                                               max_iter=5, tol=None, class_weight='balanced')),
+                         ])
+
+    text_clf = text_clf.fit(X_train, y_train)
+    test_results(text_clf, X_test, y_test)
+
+def sgd_bigram(X_train, y_train, X_test, y_test):
+    print "--------------------------"
+    print "SGD (Bigram + TFIDF)"
+    text_clf = Pipeline([('vect', CountVectorizer(ngram_range=(1, 3), token_pattern=r'\b\w+\b', min_df=1)),
+                         ('tfidf', TfidfTransformer()),
+                         ('clf', SGDClassifier(loss='hinge', penalty='l2',
+                                               alpha=1e-3, random_state=42,
+                                               max_iter=5, tol=None, class_weight='balanced'))
+                         ])
+
+    text_clf = text_clf.fit(X_train, y_train)
+    test_results(text_clf, X_test, y_test)
